@@ -3,27 +3,67 @@ from PIL import Image, ImageTk
 import google.generativeai as genai
 import threading
 import os
+import ctypes
 
 # === Configura o cliente do Gemini ===
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# === Janela principal ===
+# === Janela principal (transparente) ===
 root = tk.Tk()
 root.title("Aurora")
-root.geometry("200x250+600+400")
-root.configure(bg="white")
+# Centraliza horizontalmente e encosta na barra de tarefas
+largura = 200
+altura = 250
+largura_tela = root.winfo_screenwidth()
+altura_tela = root.winfo_screenheight()
+
+# Calcula posição
+x = (largura_tela - largura) // 2 + 850
+y = altura_tela - altura - 40  # "40" = altura média da barra de tarefas
+
+root.geometry(f"{largura}x{altura}+{x}+{y}")
+root.overrideredirect(True)  # Remove bordas e título
+root.wm_attributes("-transparentcolor", "white")  # Cor branca vira transparente
+root.wm_attributes("-topmost", True)
+root.configure(bg="white")  # Fundo branco será invisível
+
+# === Movimento com o mouse ===
+def start_move(event):
+    root.x = event.x
+    root.y = event.y
+
+def do_move(event):
+    x = root.winfo_pointerx() - root.x
+    y = root.winfo_pointery() - root.y
+    root.geometry(f"+{x}+{y}")
+
+# === Faz a janela ficar ACIMA da barra de tarefas ===
+def stay_on_top_of_taskbar(hwnd=None):
+    if hwnd is None:
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+    HWND_TOPMOST = -1
+    SWP_NOMOVE = 0x0002
+    SWP_NOSIZE = 0x0001
+    SWP_SHOWWINDOW = 0x0040
+    ctypes.windll.user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                                      SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+
+root.after(100, stay_on_top_of_taskbar)
+
+root.bind("<Button-1>", start_move)
+root.bind("<B1-Motion>", do_move)
 
 # === Imagens ===
-img = Image.open("frieren.jpg").resize((200, 200))
+img = Image.open("frieren.png").resize((200, 200))
 photo = ImageTk.PhotoImage(img)
 
-img2 = Image.open("frieren_work.jpg").resize((200, 200))
+img2 = Image.open("frieren_work.png").resize((200, 200))
 photo2 = ImageTk.PhotoImage(img2)
 
-img3 = Image.open("frieren_duvida.jpg").resize((200, 200))
+img3 = Image.open("frieren_duvida.png").resize((200, 200))
 photo3 = ImageTk.PhotoImage(img3)
 
-label = tk.Label(root, image=photo, bg="white")
+label = tk.Label(root, image=photo, bg="white", bd=0, highlightthickness=0)
 label.pack()
 
 # === Balões de fala iniciais ===
@@ -66,10 +106,14 @@ def abrir_conversa():
     menu_janela.withdraw()
     abrir_chat()
 
+def encerrar():
+    root.destroy()  # Encerra completamente o programa    
+
 opcoes = [
     ("Criar senha segura", criar_senha),
     ("Conversar", abrir_conversa),
-    ("Banco de senhas", banco_senhas)
+    ("Banco de senhas", banco_senhas),
+    ("Encerrar", encerrar)  
 ]
 
 for nome, comando in opcoes:
@@ -79,15 +123,15 @@ for nome, comando in opcoes:
 def posicionar():
     x = root.winfo_x()
     y = root.winfo_y()
-    fala.geometry(f"+{x - 70}+{y + 100}")
-    fala1.geometry(f"+{x - 90}+{y + 130}")
-    menu_janela.geometry(f"+{x + 220}+{y + 50}")
+    fala.geometry(f"+{x - 110}+{y + 100}")
+    fala1.geometry(f"+{x - 150}+{y + 130}")
+    menu_janela.geometry(f"+{x - 220}+{y + 50}")
     root.after(100, posicionar)
 
 def iniciar():
     fala.withdraw()
     fala1.withdraw()
-    botao_iniciar.pack_forget()
+    botao_iniciar.place_forget()
     label.config(image=photo2)
     menu_janela.deiconify()
 
@@ -95,11 +139,21 @@ def iniciar():
 def abrir_chat():
     chat_win = tk.Toplevel(root)
     chat_win.title("Aurora - Conversa")
-    chat_win.geometry("320x220+850+350")
+    chat_win.geometry("550x350+850+350")
     chat_win.configure(bg="#f9f9f9")
     chat_win.resizable(False, False)
 
-    # === Janela de resposta (tipo balão de fala) ===
+    # 🆕 Quando o usuário fecha a janela, chama a função 'voltar_inicio'
+    def voltar_inicio():
+        chat_win.destroy()
+        label.config(image=photo)         # Volta para imagem inicial
+        fala.deiconify()                  # Mostra as falas iniciais
+        fala1.deiconify()
+        botao_iniciar.place(x=0.5, y=10)
+        menu_janela.withdraw()            # Esconde o menu
+
+    chat_win.protocol("WM_DELETE_WINDOW", voltar_inicio)  # 🆕 intercepta o fechamento
+
     resposta_frame = tk.Frame(chat_win, bg="#f9f9f9")
     resposta_frame.pack(fill="both", expand=True, padx=10, pady=(10, 5))
 
@@ -119,7 +173,6 @@ def abrir_chat():
     )
     resposta_label.pack(anchor="w", pady=(0, 10), fill="x")
 
-    # === Janela de pergunta ===
     pergunta_frame = tk.Frame(chat_win, bg="#f9f9f9")
     pergunta_frame.pack(fill="x", pady=(0, 10), padx=10)
 
@@ -142,37 +195,30 @@ def abrir_chat():
             return
         entrada.delete(0, tk.END)
 
-        resposta_label.config(
-            text="⏳ Pensando...",
-            bg="#eaeaea",
-            fg="#333333"
-        )
-
+        resposta_label.config(text="⏳ Pensando...", bg="#eaeaea", fg="#333333")
         threading.Thread(target=lambda: responder_gemini(user_msg)).start()
 
     def responder_gemini(mensagem):
         try:
             model = genai.GenerativeModel("gemini-2.0-flash")
             resposta = model.generate_content(
-                f"Você é Aurora, uma assistente, quero que você haja meio durona, mas que gosta da pessoa, como um tsundere.\nUsuário: {mensagem}"
+                f"Você é Aurora, uma assistente brava, mas gentil.Tente não responder com muitos caracteres\nUsuário: {mensagem}"
             )
             texto = resposta.text.strip()
         except Exception as e:
             texto = f"[Erro ao conectar com o Gemini: {e}]"
 
-        resposta_label.config(
-            text=texto,
-            bg="#d1f0ff",
-            fg="#000000"
-        )
+        resposta_label.config(text=texto, bg="#d1f0ff", fg="#000000")
 
     enviar_btn.config(command=enviar)
     entrada.bind("<Return>", enviar)
     entrada.focus()
 
-# === Botão Iniciar ===
-botao_iniciar = tk.Button(root, text="Iniciar", command=iniciar, bg="#4CAF50", fg="white", font=("Arial", 10, "bold"))
-botao_iniciar.pack(pady=5)
+# === Botão Iniciar (flutuante sobre a imagem) ===
+botao_iniciar = tk.Button(root, text="Iniciar", command=iniciar,
+                          bg="#4CAF50", fg="white",
+                          font=("Arial", 10, "bold"))
+botao_iniciar.place(x=0.5, y=10)
 
 # === Inicia com falas ===
 posicionar()
