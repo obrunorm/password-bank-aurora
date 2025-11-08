@@ -1,9 +1,15 @@
+"""
+Aurora - Assistente virtual com gerenciador de senhas
+"""
 import tkinter as tk
 from PIL import Image, ImageTk
 import google.generativeai as genai
 import threading
 import os
 import ctypes
+from gui.password_manager_window import PasswordManagerWindow
+import secrets
+import string
 
 # === Configura o cliente do Gemini ===
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -95,11 +101,72 @@ menu_janela.withdraw()
 tk.Label(menu_janela, text="Menu Aurora", font=("Arial", 11, "bold"),
          bg="white", pady=5).pack()
 
-def criar_senha():
-    print("Criar senha segura (futuro recurso)")
+def criar_senha(root):
+    # === Gerar senha segura ===
+    alfabeto = string.ascii_letters + string.digits + string.punctuation
+    senha = ''.join(secrets.choice(alfabeto) for _ in range(24))
+
+    # === Criar nova janela ===
+    janela_senha = tk.Toplevel(root)
+    janela_senha.title("Senha Gerada")
+    janela_senha.overrideredirect(True)  # Remove bordas
+    janela_senha.wm_attributes("-topmost", True)
+    janela_senha.configure(bg="#f2f2f2")
+
+    # === Centralizar na tela ===
+    largura, altura = 300, 140
+    x = (janela_senha.winfo_screenwidth() - largura) // 2
+    y = (janela_senha.winfo_screenheight() - altura) // 2
+    janela_senha.geometry(f"{largura}x{altura}+{x}+{y}")
+
+    # === Label com a senha ===
+    label = tk.Label(
+        janela_senha,
+        text=senha,
+        font=("Consolas", 12, "bold"),
+        bg="white",
+        fg="black",
+        wraplength=260,
+        padx=10,
+        pady=10,
+        relief="solid",
+        bd=1
+    )
+    label.pack(pady=10)
+
+    # === Função para copiar a senha ===
+    def copiar_senha():
+        root.clipboard_clear()
+        root.clipboard_append(senha)
+        messagebox.showinfo("Copiado", "Senha copiada para a área de transferência!")
+
+    # === Botões ===
+    frame_botoes = tk.Frame(janela_senha, bg="#f2f2f2")
+    frame_botoes.pack(pady=5)
+
+    btn_copiar = tk.Button(
+        frame_botoes, text="Copiar Senha",
+        font=("Arial", 10, "bold"),
+        bg="#0078D7", fg="white",
+        padx=10, pady=5,
+        relief="flat",
+        command=copiar_senha
+    )
+    btn_copiar.grid(row=0, column=0, padx=5)
+
+    btn_fechar = tk.Button(
+        frame_botoes, text="Fechar",
+        font=("Arial", 10, "bold"),
+        bg="#D9534F", fg="white",
+        padx=10, pady=5,
+        relief="flat",
+        command=janela_senha.destroy
+    )
+    btn_fechar.grid(row=0, column=1, padx=5)
 
 def banco_senhas():
-    print("Abrir banco de senhas (futuro recurso)")
+    """Abre o gerenciador de senhas"""
+    PasswordManagerWindow(root)
 
 def abrir_conversa():
     label.config(image=photo3)
@@ -110,10 +177,10 @@ def encerrar():
     root.destroy()  # Encerra completamente o programa    
 
 opcoes = [
-    ("Criar senha segura", criar_senha),
+    ("Criar senha segura", lambda: criar_senha(root)),
     ("Conversar", abrir_conversa),
     ("Banco de senhas", banco_senhas),
-    ("Encerrar", encerrar)  
+    ("Encerrar", encerrar)
 ]
 
 for nome, comando in opcoes:
@@ -226,3 +293,4 @@ fala.deiconify()
 fala1.deiconify()
 
 root.mainloop()
+
