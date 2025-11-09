@@ -38,3 +38,5 @@ def verificar_banco():
     """
     return os.path.exists(DB_PATH)
 
+
+

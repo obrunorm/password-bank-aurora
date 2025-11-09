@@ -3,7 +3,7 @@ Interface gráfica para o gerenciador de senhas
 """
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from core.password_manager import salvar_senha, ler_senhas, deletar_senha
+from core.password_manager import salvar_senha, ler_senhas, deletar_senha, deletar_todas_senhas
 from core.database import inicializar_banco
 
 
@@ -91,8 +91,8 @@ class PasswordManagerWindow:
                 )
                 continue
             
-            # Senhas coincidem - define a senha-mestra
-            self.senha_mestra = senha1
+            # Senhas coincidem - define a senha-mestra (remove espaços extras)
+            self.senha_mestra = senha1.strip()
             messagebox.showinfo(
                 "Senha-Mestra Criada",
                 "Sua senha-mestra foi criada com sucesso!\n\n"
@@ -113,6 +113,9 @@ class PasswordManagerWindow:
         
         if not self.senha_mestra:
             return  # Usuário cancelou
+        
+        # Remove espaços em branco no início e fim (mas mantém espaços internos)
+        self.senha_mestra = self.senha_mestra.strip()
         
         # Verifica se a senha-mestra está correta tentando ler as senhas
         senhas = ler_senhas(self.senha_mestra)
@@ -195,7 +198,20 @@ class PasswordManagerWindow:
             padx=15,
             pady=5
         )
-        btn_deletar.pack(side="left")
+        btn_deletar.pack(side="left", padx=(0, 5))
+        
+        # Botão deletar tudo
+        btn_deletar_tudo = tk.Button(
+            botoes_frame,
+            text="⚠️ Apagar Tudo",
+            command=self.deletar_todas_senhas,
+            bg="#d32f2f",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            padx=15,
+            pady=5
+        )
+        btn_deletar_tudo.pack(side="left")
         
         # Frame para a árvore (tabela)
         tree_frame = tk.Frame(main_frame, bg="#f9f9f9")
@@ -358,6 +374,43 @@ class PasswordManagerWindow:
                 self.atualizar_lista()
             else:
                 messagebox.showerror("Erro", "Erro ao deletar a senha!")
+    
+    def deletar_todas_senhas(self):
+        """
+        Deleta todas as senhas do banco de dados após confirmação.
+        """
+        # Confirmação dupla para evitar acidentes
+        resposta1 = messagebox.askyesno(
+            "⚠️ ATENÇÃO",
+            "Você está prestes a APAGAR TODAS as senhas do banco de dados!\n\n"
+            "Esta ação NÃO pode ser desfeita!\n\n"
+            "Deseja continuar?",
+            icon="warning"
+        )
+        
+        if not resposta1:
+            return
+        
+        # Segunda confirmação
+        resposta2 = messagebox.askyesno(
+            "⚠️ CONFIRMAÇÃO FINAL",
+            "Tem CERTEZA que deseja apagar TODAS as senhas?\n\n"
+            "Esta ação é IRREVERSÍVEL!",
+            icon="warning"
+        )
+        
+        if not resposta2:
+            return
+        
+        # Deleta todas as senhas
+        if deletar_todas_senhas():
+            messagebox.showinfo(
+                "✅ Concluído",
+                "Todas as senhas foram apagadas do banco de dados!"
+            )
+            self.atualizar_lista()
+        else:
+            messagebox.showerror("Erro", "Erro ao apagar as senhas!")
     
     def copiar_senha(self, event):
         """

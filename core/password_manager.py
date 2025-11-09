@@ -22,13 +22,17 @@ def gerar_chave(senha_mestra, salt):
     Returns:
         Chave Fernet codificada em base64
     """
+    # Garante que a senha mestra é uma string e usa UTF-8 explicitamente
+    if not isinstance(senha_mestra, str):
+        senha_mestra = str(senha_mestra)
+    
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
         iterations=PBKDF2_ITERATIONS,
     )
-    return base64.urlsafe_b64encode(kdf.derive(senha_mestra.encode()))
+    return base64.urlsafe_b64encode(kdf.derive(senha_mestra.encode('utf-8')))
 
 
 def criptografar(chave, texto):
@@ -42,7 +46,9 @@ def criptografar(chave, texto):
     Returns:
         Texto criptografado (bytes)
     """
-    return Fernet(chave).encrypt(texto.encode())
+    if not isinstance(texto, str):
+        texto = str(texto)
+    return Fernet(chave).encrypt(texto.encode('utf-8'))
 
 
 def descriptografar(chave, texto_cript):
@@ -56,7 +62,7 @@ def descriptografar(chave, texto_cript):
     Returns:
         Texto descriptografado (str)
     """
-    return Fernet(chave).decrypt(texto_cript).decode()
+    return Fernet(chave).decrypt(texto_cript).decode('utf-8')
 
 
 def salvar_senha(nome, usuario, senha, senha_mestra):
@@ -75,6 +81,10 @@ def salvar_senha(nome, usuario, senha, senha_mestra):
     try:
         # Garante que o banco existe
         inicializar_banco()
+        
+        # Garante que a senha mestra é uma string
+        if not isinstance(senha_mestra, str):
+            senha_mestra = str(senha_mestra)
         
         # Gera salt único para esta senha
         salt = os.urandom(SALT_LENGTH)
@@ -115,6 +125,10 @@ def ler_senhas(senha_mestra):
         return senhas
     
     try:
+        # Garante que a senha mestra é uma string
+        if not isinstance(senha_mestra, str):
+            senha_mestra = str(senha_mestra)
+        
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             for id_senha, nome, usuario, senha_cript, salt in c.execute(
@@ -154,6 +168,24 @@ def deletar_senha(senha_id):
         return True
     except Exception as e:
         print(f"Erro ao deletar senha: {e}")
+        return False
+
+
+def deletar_todas_senhas():
+    """
+    Deleta todas as senhas do banco de dados.
+    
+    Returns:
+        True se deletou com sucesso, False caso contrário
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM senhas")
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao deletar todas as senhas: {e}")
         return False
 
 
